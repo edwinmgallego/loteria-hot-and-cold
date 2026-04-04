@@ -35,48 +35,92 @@ def generar_propuestas_loteria():
     df_numeros['numero'] = df_numeros['numero'].astype(str).str.zfill(4)
     df_series['serie'] = df_series['serie'].astype(str).str.zfill(3)
     
-    # 2. DESCOMPONER Y CONTAR (Como hicimos en el mapa de calor)
+    # 2. DESCOMPONER Y CONTAR
     conteo_num = df_numeros['numero'].apply(list).explode().value_counts().reset_index()
     conteo_num.columns = ['Dígito', 'Frecuencia']
     
     conteo_ser = df_series['serie'].apply(list).explode().value_counts().reset_index()
     conteo_ser.columns = ['Dígito', 'Frecuencia']
     
-    # 3. IDENTIFICAR LOS EXTREMOS (Calientes y Fríos)
-    # Tomamos los 4 primeros para el número y los 3 primeros para la serie
-    num_calientes = conteo_num['Dígito'].head(4).tolist()
-    num_frios = conteo_num['Dígito'].tail(4).tolist()
+    # 3. IDENTIFICAR LOS GRUPOS (Calientes, Tibios y Fríos)
+    todos_num = conteo_num['Dígito'].tolist()
+    num_calientes = todos_num[:4]  # Top 4
+    num_tibios = todos_num[4:6]    # Los 2 del medio
+    num_frios = todos_num[6:]      # Los 4 menos frecuentes
     
-    ser_calientes = conteo_ser['Dígito'].head(3).tolist()
-    ser_frios = conteo_ser['Dígito'].tail(3).tolist()
+    todos_ser = conteo_ser['Dígito'].tolist()
+    ser_calientes = todos_ser[:3]  # Top 3
+    ser_tibios = todos_ser[3:7]    # Los 4 del medio
+    ser_frios = todos_ser[7:]      # Los 3 menos frecuentes
     
     print("\n==================================================")
-    print(f"🔥 INGREDIENTES CALIENTES:")
-    print(f"   Dígitos para Número: {num_calientes} | Para Serie: {ser_calientes}")
-    print(f"❄️ INGREDIENTES FRÍOS:")
-    print(f"   Dígitos para Número: {num_frios} | Para Serie: {ser_frios}")
+    print(f"🔥 CALIENTES : Número {num_calientes} | Serie {ser_calientes}")
+    print(f"🌤️ TIBIOS    : Número {num_tibios} | Serie {ser_tibios}")
+    print(f"❄️ FRÍOS     : Número {num_frios} | Serie {ser_frios}")
     print("==================================================\n")
 
-    # 4. FUNCIÓN GENERADORA DE BILLETES
-    def armar_billetes(digitos_n, digitos_s, cantidad=3):
+    # 4. FUNCIONES GENERADORAS
+    def armar_billetes_extremos(digitos_n, digitos_s, cantidad=3):
+        """Genera billetes puros (solo calientes o solo fríos)"""
         billetes = []
         for _ in range(cantidad):
-            # Usamos random.sample para mezclar los dígitos sin repetir la misma estructura
             n_mezclado = "".join(random.sample(digitos_n, len(digitos_n)))
             s_mezclado = "".join(random.sample(digitos_s, len(digitos_s)))
             billetes.append((n_mezclado, s_mezclado))
         return billetes
 
-    # 5. GENERAR Y MOSTRAR RESULTADOS
-    jugadas_calientes = armar_billetes(num_calientes, ser_calientes)
-    jugadas_frias = armar_billetes(num_frios, ser_frios)
+    def armar_billetes_hibridos(cantidad=5):
+        """Genera billetes realistas mezclando los 3 grupos"""
+        billetes = []
+        # Patrones para el Número (4 cifras): (Cant. Calientes, Cant. Tibios, Cant. Fríos)
+        patrones_numero = [
+            (2, 1, 1), # 2 calientes, 1 tibio, 1 frío (Muy balanceado)
+            (1, 2, 1), # 1 caliente, 2 tibios, 1 frío
+            (1, 0, 3), # 1 caliente, 0 tibios, 3 fríos (El patrón que detectaste ayer)
+            (1, 1, 2)  # 1 caliente, 1 tibio, 2 fríos
+        ]
+        
+        # Patrones para la Serie (3 cifras):
+        patrones_serie = [
+            (1, 1, 1), # 1 de cada uno
+            (2, 0, 1), # 2 calientes, 1 frío
+            (0, 2, 1)  # 2 tibios, 1 frío
+        ]
+        
+        for _ in range(cantidad):
+            # 1. Armar el número
+            p_n_cal, p_n_tib, p_n_fri = random.choice(patrones_numero)
+            sel_num = random.sample(num_calientes, p_n_cal) + \
+                      random.sample(num_tibios, p_n_tib) + \
+                      random.sample(num_frios, p_n_fri)
+            random.shuffle(sel_num) # Revolver posiciones
+            
+            # 2. Armar la serie
+            p_s_cal, p_s_tib, p_s_fri = random.choice(patrones_serie)
+            sel_ser = random.sample(ser_calientes, p_s_cal) + \
+                      random.sample(ser_tibios, p_s_tib) + \
+                      random.sample(ser_frios, p_s_fri)
+            random.shuffle(sel_ser) # Revolver posiciones
+            
+            billetes.append(("".join(sel_num), "".join(sel_ser)))
+            
+        return billetes
 
-    print("🔥🔥🔥 TUS 3 JUGADAS CALIENTES (Mayor Probabilidad Histórica) 🔥🔥🔥")
+    # 5. GENERAR Y MOSTRAR RESULTADOS
+    jugadas_calientes = armar_billetes_extremos(num_calientes, ser_calientes, 2)
+    jugadas_frias = armar_billetes_extremos(num_frios, ser_frios, 2)
+    jugadas_hibridas = armar_billetes_hibridos(5) # Generamos 5 opciones realistas
+
+    print("🔥🔥 JUGADAS EXTREMAS (Puro Fuego) 🔥🔥")
     for i, (num, ser) in enumerate(jugadas_calientes, 1):
         print(f"   Opción {i}: Número {num} - Serie {ser}")
         
-    print("\n🧊🧊🧊 TUS 3 JUGADAS FRÍAS (Los más olvidados por la máquina) 🧊🧊🧊")
+    print("\n🧊🧊 JUGADAS EXTREMAS (Puro Hielo) 🧊🧊")
     for i, (num, ser) in enumerate(jugadas_frias, 1):
+        print(f"   Opción {i}: Número {num} - Serie {ser}")
+        
+    print("\n🎯🎯 JUGADAS HÍBRIDAS (Regresión a la Media - Recomendadas) 🎯🎯")
+    for i, (num, ser) in enumerate(jugadas_hibridas, 1):
         print(f"   Opción {i}: Número {num} - Serie {ser}")
     print("\n==================================================")
 
